@@ -81,8 +81,8 @@ pipeline {
 
         stage('Verify Rollout') {
             steps {
-                sh 'kubectl -n demo-app rollout status deployment/demo-be --timeout=60s'
-                sh 'kubectl -n demo-app rollout status deployment/demo-fe --timeout=60s'
+                sh 'kubectl -n demo-app rollout status deployment/demo-be-demo-app --timeout=60s'
+                sh 'kubectl -n demo-app rollout status deployment/demo-fe-demo-app --timeout=60s'
                 sh 'kubectl -n demo-app get pods,svc -l "app.kubernetes.io/instance in (demo-be, demo-fe)"'
             }
         }
