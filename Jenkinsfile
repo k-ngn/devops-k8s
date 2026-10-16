@@ -58,7 +58,7 @@ pipeline {
                 echo "==> Deploying Backend to Kubernetes..."
                 sh """
                     helm upgrade --install demo-be ./charts/demo-app \
-                        -f ./app/backend/values.yaml \
+                        -f ./app/backend/values-dev.yaml \
                         --set image.tag=${BUILD_ID} \
                         --namespace default \
                         --atomic \
@@ -68,7 +68,7 @@ pipeline {
                 echo "==> Deploying Frontend to Kubernetes..."
                 sh """
                     helm upgrade --install demo-fe ./charts/demo-app \
-                        -f ./app/frontend/values.yaml \
+                        -f ./app/frontend/values-dev.yaml \
                         --set image.tag=${BUILD_ID} \
                         --namespace default \
                         --atomic \
