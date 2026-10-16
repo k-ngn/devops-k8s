@@ -94,7 +94,7 @@ pipeline {
         }
         failure {
             echo "==> Pipeline failed! Inspecting failed pods..."
-            sh 'kubectl get pods --field-selector=status.phase!=Running'
+            sh 'kubectl -n demo-app get pods --field-selector=status.phase!=Running'
         }
     }
 }
