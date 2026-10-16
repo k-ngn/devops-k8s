@@ -1,0 +1,39 @@
+replicaCount: 1
+
+image:
+  repository: registry:5000/demo-fe
+  pullPolicy: Always
+  tag: latest
+
+service:
+  type: NodePort
+  port: 80
+  targetPort: 80
+  nodePort: 30080
+
+env:
+  - name: BACKEND_URL
+    value: "http://demo-be.demo-app.svc:4000"
+
+livenessProbe:
+  enabled: true
+  path: /healthz
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+readinessProbe:
+  enabled: true
+  path: /healthz
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 25m
+    memory: 32Mi
+
+autoscaling:
+  enabled: false

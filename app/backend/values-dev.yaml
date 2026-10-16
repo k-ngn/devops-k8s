@@ -1,0 +1,42 @@
+replicaCount: 1
+
+image:
+  repository: registry:5000/demo-be
+  pullPolicy: Always
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 4000
+  targetPort: 4000
+
+env:
+  - name: PORT
+    value: "4000"
+  - name: NODE_ENV
+    value: "production"
+  - name: APP_VERSION
+    value: "1.0.0"
+
+livenessProbe:
+  enabled: true
+  path: /healthz
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+readinessProbe:
+  enabled: true
+  path: /healthz
+  initialDelaySeconds: 5
+  periodSeconds: 5
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+autoscaling:
+  enabled: false

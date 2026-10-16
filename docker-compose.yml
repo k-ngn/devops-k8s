@@ -1,0 +1,157 @@
+services:
+  # 1. Local Container Registry (Used by Jenkins Agent to push & K3s to pull)
+  registry:
+    image: ${REGISTRY_IMAGE:-registry:2}
+    container_name: registry
+    restart: unless-stopped
+    ports:
+      - "${REGISTRY_PORT:-5000}:5000"
+    volumes:
+      - registry_data:/var/lib/registry
+    networks:
+      - devops-net
+
+  # 2. Isolated Docker Daemon (Avoids host /var/run/docker.sock bind mount on Win/Mac/Linux)
+  dind:
+    image: ${DIND_IMAGE:-docker:27-dind}
+    container_name: dind
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - DOCKER_TLS_CERTDIR=
+    command:
+      - "--host=tcp://0.0.0.0:2375"
+      - "--insecure-registry=registry:5000"
+      - "--storage-driver=overlay2"
+    volumes:
+      - dind_storage:/var/lib/docker
+    networks:
+      - devops-net
+
+  # 3. K3s Single-Node Cluster (Configures registry:5000 inline without host bind mounts)
+  k3s:
+    image: ${K3S_IMAGE:-rancher/k3s:v1.36.5-k3s1}
+    container_name: k3s
+    hostname: k3s
+    privileged: true
+    restart: unless-stopped
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /etc/rancher/k3s
+        cat <<EOF > /etc/rancher/k3s/registries.yaml
+        mirrors:
+          "registry:5000":
+            endpoint:
+              - "http://registry:5000"
+        EOF
+        exec /bin/k3s server \
+          --tls-san=k3s \
+          --disable=traefik \
+          --write-kubeconfig=/output/kubeconfig.yaml \
+          --write-kubeconfig-mode=644
+    environment:
+      - K3S_TOKEN=${K3S_TOKEN}
+    ports:
+      - "${K3S_API_PORT:-6443}:6443"
+      - "${K3S_HTTP_NODEPORT:-30080}:30080"
+      - "${K3S_GRAFANA_NODEPORT:-30300}:30300"
+    volumes:
+      - k3s_server:/var/lib/rancher/k3s
+      - k3s_kubeconfig:/output
+    networks:
+      - devops-net
+
+  # 4. Jenkins Controller (Zero-Wizard Setup + Pre-installed Plugins)
+  jenkins-controller:
+    build:
+      context: ./infra/jenkins-controller
+      args:
+        JENKINS_IMAGE: ${JENKINS_IMAGE:-jenkins/jenkins:lts-jdk21}
+    container_name: jenkins-controller
+    restart: unless-stopped
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Dhudson.model.DirectoryBrowserSupport.CSP=
+      - JENKINS_ADMIN_USER=${JENKINS_ADMIN_USER:-admin}
+      - JENKINS_ADMIN_PASS=${JENKINS_ADMIN_PASS:-admin123}
+      - JENKINS_ROOT_URL=http://jenkins-controller:8080/
+    ports:
+      - "${JENKINS_PORT:-8080}:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    networks:
+      - devops-net
+
+  # 5. Jenkins Auto-Join Agent (Inspired by shamil/docker-jenkins-auto-agent + K3s & Helm CLI)
+  jenkins-agent:
+    build:
+      context: ./infra/jenkins-agent
+      args:
+        JENKINS_AGENT_IMAGE: ${JENKINS_AGENT_IMAGE:-jenkins/inbound-agent:latest-jdk21}
+    container_name: jenkins-agent
+    restart: unless-stopped
+    depends_on:
+      - jenkins-controller
+      - dind
+      - k3s
+      - registry
+    environment:
+      - JENKINS_URL=http://jenkins-controller:8080
+      - JENKINS_ADMIN_USER=${JENKINS_ADMIN_USER:-admin}
+      - JENKINS_ADMIN_PASS=${JENKINS_ADMIN_PASS:-admin123}
+      - AGENT_NAME=${JENKINS_AGENT_NAME:-k8s-auto-agent}
+      - AGENT_EXECUTORS=${JENKINS_AGENT_EXECUTORS:-4}
+      - AGENT_LABELS=${JENKINS_AGENT_LABELS:-k8s docker helm linux}
+      - AGENT_WORKDIR=/home/jenkins/agent
+      - DOCKER_HOST=tcp://dind:2375
+    volumes:
+      - jenkins_agent_workdir:/home/jenkins/agent
+      - k3s_kubeconfig:/k3s-config:ro
+    networks:
+      - devops-net
+
+  # =========================================================================
+  # DEMO APPLICATION (Uncomment for local Docker Compose standalone testing;
+  # keep commented when deploying to K3s via Jenkins Pipeline in Task 1)
+  # =========================================================================
+  # demo-be:
+  #   build:
+  #     context: ./app/backend
+  #   container_name: demo-be
+  #   restart: unless-stopped
+  #   environment:
+  #     - PORT=4000
+  #     - NODE_ENV=development
+  #     - APP_VERSION=1.0.0
+  #   ports:
+  #     - "${DEMO_BE_PORT:-4000}:4000"
+  #   networks:
+  #     - devops-net
+
+  # demo-fe:
+  #   build:
+  #     context: ./app/frontend
+  #   container_name: demo-fe
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - demo-be
+  #   environment:
+  #     - BACKEND_URL=http://demo-be:4000
+  #   ports:
+  #     - "${DEMO_FE_PORT:-3000}:80"
+  #   networks:
+  #     - devops-net
+
+volumes:
+  registry_data:
+  dind_storage:
+  k3s_server:
+  k3s_kubeconfig:
+  jenkins_home:
+  jenkins_agent_workdir:
+
+networks:
+  devops-net:
+    driver: bridge
