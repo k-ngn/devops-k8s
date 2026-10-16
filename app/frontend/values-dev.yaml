@@ -13,7 +13,7 @@ service:
 
 env:
   - name: BACKEND_URL
-    value: "http://demo-be.demo-app.svc.cluster.local:4000"
+    value: "http://demo-be-demo-app.demo-app.svc.cluster.local:4000"
 
 livenessProbe:
   enabled: true
