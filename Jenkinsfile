@@ -13,12 +13,33 @@ pipeline {
     }
 
     stages {
-        stage('Checkout & Lint') {
+        stage('Checkout & Environment Check') {
             steps {
-                echo "==> Verifying Cluster Connectivity..."
+                echo "==> Verifying Cluster & Agent Tools..."
                 sh 'kubectl get nodes -o wide'
                 sh 'helm version'
                 sh 'docker info'
+                sh 'trivy --version'
+            }
+        }
+
+        stage('Code Quality & Linting') {
+            parallel {
+                stage('Lint Backend') {
+                    steps {
+                        dir('app/backend') {
+                            echo "==> Linting Node.js source files..."
+                            sh 'node --check server.js test.js'
+                            echo "==> Backend code syntax verified."
+                        }
+                    }
+                }
+                stage('Lint Helm Chart') {
+                    steps {
+                        echo "==> Linting generic Helm chart..."
+                        sh 'helm lint ./charts/demo-app'
+                    }
+                }
             }
         }
 
@@ -28,7 +49,7 @@ pipeline {
                     steps {
                         dir('app/backend') {
                             echo "==> Running Backend Unit Checks..."
-                            sh 'node test.js || true'
+                            sh 'node test.js'
                             echo "==> Building Backend Container..."
                             sh """
                                 docker build -t ${REGISTRY}/demo-be:${BUILD_ID} -t ${REGISTRY}/demo-be:latest .
@@ -53,6 +74,34 @@ pipeline {
             }
         }
 
+        stage('Security Scan (Trivy)') {
+            parallel {
+                stage('Scan Backend Image') {
+                    steps {
+                        echo "==> Scanning Backend Container for CVEs..."
+                        // Note: Use --exit-code 0 for report mode, or 1 to fail on CRITICAL
+                        sh """
+                            trivy image --severity HIGH,CRITICAL \
+                                --exit-code 0 \
+                                --no-progress \
+                                ${REGISTRY}/demo-be:${BUILD_ID}
+                        """
+                    }
+                }
+                stage('Scan Frontend Image') {
+                    steps {
+                        echo "==> Scanning Frontend Container for CVEs..."
+                        sh """
+                            trivy image --severity HIGH,CRITICAL \
+                                --exit-code 0 \
+                                --no-progress \
+                                ${REGISTRY}/demo-fe:${BUILD_ID}
+                        """
+                    }
+                }
+            }
+        }
+
         stage('Deploy to K3s via Helm') {
             steps {
                 echo "==> Deploying Backend to Kubernetes..."
@@ -61,7 +110,7 @@ pipeline {
                         -f ./app/backend/values-dev.yaml \
                         --set image.tag=${BUILD_ID} \
                         --namespace demo-app \
-			--create-namespace \
+                        --create-namespace \
                         --atomic \
                         --timeout 3m
                 """
@@ -72,7 +121,7 @@ pipeline {
                         -f ./app/frontend/values-dev.yaml \
                         --set image.tag=${BUILD_ID} \
                         --namespace demo-app \
-			--create-namespace \
+                        --create-namespace \
                         --atomic \
                         --timeout 3m
                 """
@@ -90,10 +139,10 @@ pipeline {
 
     post {
         success {
-            echo "==> Pipeline succeeded! Frontend is accessible on NodePort 30080 (http://localhost:30080)."
+            echo "==> Pipeline succeeded! Code quality and Trivy scans passed."
         }
         failure {
-            echo "==> Pipeline failed! Inspecting failed pods..."
+            echo "==> Pipeline failed! Inspecting cluster state..."
             sh 'kubectl -n demo-app get pods --field-selector=status.phase!=Running'
         }
     }

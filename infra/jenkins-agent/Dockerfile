@@ -3,13 +3,15 @@ FROM ${JENKINS_AGENT_IMAGE}
 
 USER root
 
-# Install system dependencies, Docker CLI, kubectl, and Helm
+# Install system dependencies, Docker CLI, kubectl, Helm, and Trivy
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     gnupg \
     jq \
     git \
+    wget \
+    apt-transport-https \
     && install -m 0755 -d /etc/apt/keyrings \
     # Install Docker CLI
     && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
@@ -22,6 +24,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && chmod +x /usr/local/bin/kubectl \
     # Install Helm
     && curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash \
+    # Install Trivy
+    && wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor -o /etc/apt/keyrings/trivy.gpg \
+    && chmod a+r /etc/apt/keyrings/trivy.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" > /etc/apt/sources.list.d/trivy.list \
+    && apt-get update && apt-get install -y --no-install-recommends trivy \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
