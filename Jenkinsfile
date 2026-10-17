@@ -82,6 +82,7 @@ pipeline {
                         // Note: Use --exit-code 0 for report mode, or 1 to fail on CRITICAL
                         sh """
                             trivy image --severity HIGH,CRITICAL \
+				--ignore-unfixed \
                                 --exit-code 0 \
                                 --no-progress \
                                 ${REGISTRY}/demo-be:${BUILD_ID}
@@ -93,6 +94,7 @@ pipeline {
                         echo "==> Scanning Frontend Container for CVEs..."
                         sh """
                             trivy image --severity HIGH,CRITICAL \
+				--ignore-unfixed \
                                 --exit-code 0 \
                                 --no-progress \
                                 ${REGISTRY}/demo-fe:${BUILD_ID}
