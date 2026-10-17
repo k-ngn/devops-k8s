@@ -3,7 +3,7 @@ FROM ${JENKINS_AGENT_IMAGE}
 
 USER root
 
-# Install system dependencies, Docker CLI, kubectl, Helm, and Trivy
+# Install system dependencies, Docker CLI, kubectl, Helm, NodeJS and Trivy
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -24,6 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && chmod +x /usr/local/bin/kubectl \
     # Install Helm
     && curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash \
+    # Install Node.js
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     # Install Trivy
     && wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor -o /etc/apt/keyrings/trivy.gpg \
     && chmod a+r /etc/apt/keyrings/trivy.gpg \

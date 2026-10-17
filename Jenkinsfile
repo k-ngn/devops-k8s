@@ -29,7 +29,7 @@ pipeline {
                     steps {
                         dir('app/backend') {
                             echo "==> Linting Node.js source files..."
-                            sh 'docker run --rm -v $(pwd):/app -w /app node:20-alpine node --check server.js test.js'
+                            sh 'node --check server.js test.js'
                             echo "==> Backend code syntax verified."
                         }
                     }
@@ -49,7 +49,7 @@ pipeline {
                     steps {
                         dir('app/backend') {
                             echo "==> Running Backend Unit Checks..."
-                            sh 'docker run --rm -v $(pwd):/app -w /app node:20-alpine node test.js'
+                            sh 'node test.js'
                             echo "==> Building Backend Container..."
                             sh """
                                 docker build -t ${REGISTRY}/demo-be:${BUILD_ID} -t ${REGISTRY}/demo-be:latest .
