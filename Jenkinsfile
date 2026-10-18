@@ -37,7 +37,7 @@ pipeline {
                 stage('Lint Helm Chart') {
                     steps {
                         echo "==> Linting generic Helm chart..."
-                        sh 'helm lint ./charts/demo-app'
+                        sh 'helm lint ./helm/demo-app'
                     }
                 }
             }
@@ -108,7 +108,7 @@ pipeline {
             steps {
                 echo "==> Deploying Backend to Kubernetes..."
                 sh """
-                    helm upgrade --install demo-be ./charts/demo-app \
+                    helm upgrade --install demo-be ./helm/demo-app \
                         -f ./app/backend/values-dev.yaml \
                         --set image.tag=${BUILD_ID} \
                         --namespace demo-app \
@@ -119,7 +119,7 @@ pipeline {
 
                 echo "==> Deploying Frontend to Kubernetes..."
                 sh """
-                    helm upgrade --install demo-fe ./charts/demo-app \
+                    helm upgrade --install demo-fe ./helm/demo-app \
                         -f ./app/frontend/values-dev.yaml \
                         --set image.tag=${BUILD_ID} \
                         --namespace demo-app \
