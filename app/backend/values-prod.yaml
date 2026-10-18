@@ -1,4 +1,4 @@
-replicaCount: 1
+replicaCount: 2
 
 image:
   repository: registry:5000/demo-be
@@ -14,6 +14,8 @@ env:
   - name: PORT
     value: "4000"
   - name: NODE_ENV
+    value: "production"
+  - name: APP_ENV
     value: "production"
   - name: APP_VERSION
     value: "1.0.0"

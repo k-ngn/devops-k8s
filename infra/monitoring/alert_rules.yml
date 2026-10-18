@@ -3,7 +3,7 @@ groups:
     rules:
       # Pod Health & Crashes
       - alert: KubernetesPodNotHealthy
-        expr: kube_pod_status_phase{namespace="demo-app", phase=~"Failed|Pending|Unknown"} > 0 or rate(kube_pod_container_status_restarts_total{namespace="demo-app"}[5m]) * 60 > 2
+        expr: kube_pod_status_phase{namespace=~"demo-app.*", phase=~"Failed|Pending|Unknown"} > 0 or rate(kube_pod_container_status_restarts_total{namespace=~"demo-app.*"}[5m]) * 60 > 2
         for: 1m
         labels:
           severity: critical
@@ -12,7 +12,7 @@ groups:
           description: "Pod {{ $labels.pod }} in namespace demo-app has failed probes or is crash-restarting."
 
       - alert: ContainerOOMKilled
-        expr: kube_pod_container_status_terminated_reason{namespace="demo-app", reason="OOMKilled"} > 0
+        expr: kube_pod_container_status_terminated_reason{namespace=~"demo-app.*", reason="OOMKilled"} > 0
         for: 0m
         labels:
           severity: critical
@@ -22,7 +22,7 @@ groups:
 
       # Resource Saturation (Memory & CPU)
       - alert: ContainerMemoryNearLimit
-        expr: (sum by (pod, container) (container_memory_working_set_bytes{namespace="demo-app", container!=""}) / sum by (pod, container) (container_spec_memory_limit_bytes{namespace="demo-app", container!=""})) * 100 > 85
+        expr: (sum by (pod, container) (container_memory_working_set_bytes{namespace=~"demo-app.*", container!=""}) / sum by (pod, container) (container_spec_memory_limit_bytes{namespace=~"demo-app.*", container!=""})) * 100 > 85
         for: 2m
         labels:
           severity: warning
@@ -31,7 +31,7 @@ groups:
           description: "Pod {{ $labels.pod }} memory is reaching limit ({{ $value | printf \"%.1f\" }}%). Risk of OOM."
 
       - alert: ContainerCPUThrottlingHigh
-        expr: (sum by (pod) (rate(container_cpu_cfs_throttled_periods_total{namespace="demo-app"}[5m])) / sum by (pod) (rate(container_cpu_cfs_periods_total{namespace="demo-app"}[5m]))) * 100 > 25
+        expr: (sum by (pod) (rate(container_cpu_cfs_throttled_periods_total{namespace=~"demo-app.*"}[5m])) / sum by (pod) (rate(container_cpu_cfs_periods_total{namespace=~"demo-app.*"}[5m]))) * 100 > 25
         for: 5m
         labels:
           severity: warning
@@ -41,7 +41,7 @@ groups:
 
       # Deployment Replica Status
       - alert: DeploymentReplicasMismatch
-        expr: kube_deployment_status_replicas_available{namespace="demo-app"} < kube_deployment_spec_replicas{namespace="demo-app"}
+        expr: kube_deployment_status_replicas_available{namespace=~"demo-app.*"} < kube_deployment_spec_replicas{namespace=~"demo-app.*"}
         for: 3m
         labels:
           severity: critical

@@ -15,6 +15,14 @@ pipeline {
     stages {
         stage('Checkout & Environment Check') {
             steps {
+                script {
+                    def branch = env.BRANCH_NAME ?: 'staging'
+                    echo "==> Jenkins Multibranch Pipeline triggered for branch: [${branch}]"
+                    echo "==> Workspace Git State:"
+                }
+                sh 'git status'
+                sh 'git log -1 --oneline'
+
                 echo "==> Verifying Cluster & Agent Tools..."
                 sh 'kubectl get nodes -o wide'
                 sh 'helm version'
@@ -106,46 +114,71 @@ pipeline {
 
         stage('Deploy to K3s via Helm') {
             steps {
-                echo "==> Deploying Backend to Kubernetes..."
-                sh """
-                    helm upgrade --install demo-be ./helm/demo-app \
-                        -f ./app/backend/values-dev.yaml \
-                        --set image.tag=${BUILD_ID} \
-                        --namespace demo-app \
-                        --create-namespace \
-                        --atomic \
-                        --timeout 3m
-                """
+                script {
+                    def branch = env.BRANCH_NAME ?: (params.BRANCH_NAME ?: 'staging')
+                    def targetEnv = (branch == 'main' || branch == 'prod') ? 'prod' : 'staging'
+                    def targetNamespace = "demo-app-${targetEnv}"
+                    def beValues = "./app/backend/values-${targetEnv}.yaml"
+                    def feValues = "./app/frontend/values-${targetEnv}.yaml"
 
-                echo "==> Deploying Frontend to Kubernetes..."
-                sh """
-                    helm upgrade --install demo-fe ./helm/demo-app \
-                        -f ./app/frontend/values-dev.yaml \
-                        --set image.tag=${BUILD_ID} \
-                        --namespace demo-app \
-                        --create-namespace \
-                        --atomic \
-                        --timeout 3m
-                """
+                    if (!fileExists(beValues) || !fileExists(feValues)) {
+                        error("==> FATAL: Missing values configuration files for environment [${targetEnv}]: ${beValues} or ${feValues}")
+                    }
+
+                    echo "==> Branch: [${branch}] -> Target Environment: [${targetEnv}] | Target Namespace: [${targetNamespace}]"
+                    echo "==> Deploying Backend with ${beValues}..."
+                    sh """
+                        helm upgrade --install demo-be ./helm/demo-app \
+                            -f ${beValues} \
+                            --set image.tag=${BUILD_ID} \
+                            --namespace ${targetNamespace} \
+                            --create-namespace \
+                            --atomic \
+                            --timeout 3m
+                    """
+
+                    echo "==> Deploying Frontend with ${feValues}..."
+                    sh """
+                        helm upgrade --install demo-fe ./helm/demo-app \
+                            -f ${feValues} \
+                            --set image.tag=${BUILD_ID} \
+                            --namespace ${targetNamespace} \
+                            --create-namespace \
+                            --atomic \
+                            --timeout 3m
+                    """
+                }
             }
         }
 
         stage('Verify Rollout') {
             steps {
-                sh 'kubectl -n demo-app rollout status deployment/demo-be-demo-app --timeout=60s'
-                sh 'kubectl -n demo-app rollout status deployment/demo-fe-demo-app --timeout=60s'
-                sh 'kubectl -n demo-app get pods,svc -l "app.kubernetes.io/instance in (demo-be, demo-fe)"'
+                script {
+                    def branch = env.BRANCH_NAME ?: (params.BRANCH_NAME ?: 'staging')
+                    def targetEnv = (branch == 'main' || branch == 'prod') ? 'prod' : 'staging'
+                    def targetNamespace = "demo-app-${targetEnv}"
+
+                    echo "==> Verifying Rollout Status in namespace [${targetNamespace}]..."
+                    sh "kubectl -n ${targetNamespace} rollout status deployment/demo-be-demo-app --timeout=60s"
+                    sh "kubectl -n ${targetNamespace} rollout status deployment/demo-fe-demo-app --timeout=60s"
+                    sh "kubectl -n ${targetNamespace} get pods,svc -l 'app.kubernetes.io/instance in (demo-be, demo-fe)'"
+                }
             }
         }
     }
 
     post {
         success {
-            echo "==> Pipeline succeeded! Code quality and Trivy scans passed."
+            echo "==> Multibranch Pipeline succeeded! Code quality and deployment verified."
         }
         failure {
-            echo "==> Pipeline failed! Inspecting cluster state..."
-            sh 'kubectl -n demo-app get pods --field-selector=status.phase!=Running'
+            echo "==> Multibranch Pipeline failed! Inspecting cluster state..."
+            script {
+                def branch = env.BRANCH_NAME ?: (params.BRANCH_NAME ?: 'staging')
+                def targetEnv = (branch == 'main' || branch == 'prod') ? 'prod' : 'staging'
+                def targetNamespace = "demo-app-${targetEnv}"
+                sh "kubectl -n ${targetNamespace} get pods --field-selector=status.phase!=Running || true"
+            }
         }
     }
 }

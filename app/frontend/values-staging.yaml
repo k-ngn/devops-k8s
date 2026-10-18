@@ -9,11 +9,13 @@ service:
   type: NodePort
   port: 80
   targetPort: 80
-  nodePort: 30080
+  nodePort: 30081
 
 env:
   - name: BACKEND_URL
-    value: "http://demo-be-demo-app.demo-app.svc.cluster.local:4000"
+    value: "http://demo-be-demo-app.demo-app-staging.svc.cluster.local:4000"
+  - name: APP_ENV
+    value: "staging"
 
 livenessProbe:
   enabled: true
