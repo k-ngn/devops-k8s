@@ -4,7 +4,9 @@ import org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject
 import jenkins.branch.BranchSource
 import jenkins.plugins.git.GitSCMSource
 import jenkins.plugins.git.traits.BranchDiscoveryTrait
-import com.cloudbees.hudson.plugins.folder.computed.PeriodicFolderTrigger
+import jenkins.branch.NoTriggerBranchProperty
+import jenkins.branch.DefaultBranchPropertyStrategy
+import jenkins.branch.BranchProperty
 import com.cloudbees.hudson.plugins.folder.computed.DefaultOrphanedItemStrategy
 
 def instance = Jenkins.getInstanceOrNull()
@@ -33,18 +35,19 @@ if (instance != null) {
                 new BranchDiscoveryTrait()
             ])
 
-            job.setSourcesList([new BranchSource(gitSource)])
+            // Suppress automatic builds on branch indexing and startup
+            def branchSource = new BranchSource(gitSource)
+            BranchProperty[] propList = [new NoTriggerBranchProperty()] as BranchProperty[]
+            branchSource.strategy = new DefaultBranchPropertyStrategy(propList)
+            job.setSourcesList([branchSource])
 
             // Retain up to 10 orphaned branch items for 7 days
             job.setOrphanedItemStrategy(new DefaultOrphanedItemStrategy(true, "7", "10"))
 
-            // Periodic branch scanning trigger (every 2 minutes)
-            job.addTrigger(new PeriodicFolderTrigger("2m"))
-
             job.save()
-            println "--> [Init] Scheduling initial repository scan for '${jobName}'..."
+            println "--> [Init] Scheduling initial repository branch discovery for '${jobName}' (builds suppressed)..."
             job.scheduleBuild2(0)
-            println "--> [Init] Multibranch Pipeline '${jobName}' successfully created with Git SCM Source!"
+            println "--> [Init] Multibranch Pipeline '${jobName}' successfully created with Git SCM Source (Auto-trigger disabled)!"
         } catch (Exception e) {
             println "--> [Init] ERROR: Failed to create multibranch pipeline '${jobName}': ${e.getMessage()}"
         }
