@@ -39,6 +39,7 @@ services:
       - /bin/sh
       - -c
       - |
+        mount --make-rshared /
         mkdir -p /etc/rancher/k3s
         cat <<EOF > /etc/rancher/k3s/registries.yaml
         mirrors:
@@ -56,7 +57,7 @@ services:
     ports:
       - "${K3S_API_PORT:-6443}:6443"
       - "${K3S_HTTP_NODEPORT:-30080}:30080"
-      - "${K3S_GRAFANA_NODEPORT:-30300}:30300"
+      - "${K3S_PROM_NODEPORT:-30090}:30090"
     volumes:
       - k3s_server:/var/lib/rancher/k3s
       - k3s_kubeconfig:/output
@@ -78,7 +79,7 @@ services:
       - JENKINS_ROOT_URL=http://jenkins-controller:8080/
     ports:
       - "${JENKINS_PORT:-8080}:8080"
-      - "50000:50000"
+      - "${JENKINS_JNLP_PORT:-50000}:50000"
     volumes:
       - jenkins_home:/var/jenkins_home
     networks:
@@ -144,6 +145,57 @@ services:
   #   networks:
   #     - devops-net
 
+  # 6. Central Prometheus (Scrapes Jenkins + In-Cluster K3s Prometheus + Alert Rules)
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.54.1}
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infra/monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - prometheus_data:/prometheus
+    networks:
+      - devops-net
+
+  # 7. Central Grafana (Pre-provisioned Datasources & Dashboards)
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.2.0}
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASS:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./infra/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./infra/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    networks:
+      - devops-net
+
+  # 8. Blackbox Exporter (HTTP/HTTPS Synthetic Probing for Demo App)
+  blackbox-exporter:
+    image: ${BLACKBOX_IMAGE:-prom/blackbox-exporter:v0.25.0}
+    container_name: blackbox-exporter
+    restart: unless-stopped
+    ports:
+      - "${BLACKBOX_PORT:-9115}:9115"
+    command:
+      - "--config.file=/etc/blackbox_exporter/config.yml"
+    volumes:
+      - ./infra/monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    networks:
+      - devops-net
+
 volumes:
   registry_data:
   dind_storage:
@@ -151,6 +203,8 @@ volumes:
   k3s_kubeconfig:
   jenkins_home:
   jenkins_agent_workdir:
+  prometheus_data:
+  grafana_data:
 
 networks:
   devops-net:

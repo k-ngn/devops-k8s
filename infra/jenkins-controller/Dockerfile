@@ -6,7 +6,8 @@ USER root
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
 
-# Copy Groovy initialization script to auto-create admin user
+# Copy Groovy initialization scripts to auto-create admin user and pipeline job
 COPY init-admin.groovy /usr/share/jenkins/ref/init.groovy.d/init-admin.groovy
+COPY init-job.groovy /usr/share/jenkins/ref/init.groovy.d/init-job.groovy
 
 USER jenkins

@@ -4,3 +4,5 @@ pipeline-stage-view
 credentials-binding
 timestamper
 ws-cleanup
+prometheus
+metrics

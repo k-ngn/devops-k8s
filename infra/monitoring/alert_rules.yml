@@ -1,0 +1,100 @@
+groups:
+  - name: devops_k8s_workload_alerts
+    rules:
+      # Pod Health & Crashes
+      - alert: KubernetesPodNotHealthy
+        expr: kube_pod_status_phase{namespace="demo-app", phase=~"Failed|Pending|Unknown"} > 0 or rate(kube_pod_container_status_restarts_total{namespace="demo-app"}[5m]) * 60 > 2
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod unhealthy or CrashLooping"
+          description: "Pod {{ $labels.pod }} in namespace demo-app has failed probes or is crash-restarting."
+
+      - alert: ContainerOOMKilled
+        expr: kube_pod_container_status_terminated_reason{namespace="demo-app", reason="OOMKilled"} > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container OOMKilled"
+          description: "Pod {{ $labels.pod }} container {{ $labels.container }} was killed by the OS due to memory limit exhaustion."
+
+      # Resource Saturation (Memory & CPU)
+      - alert: ContainerMemoryNearLimit
+        expr: (sum by (pod, container) (container_memory_working_set_bytes{namespace="demo-app", container!=""}) / sum by (pod, container) (container_spec_memory_limit_bytes{namespace="demo-app", container!=""})) * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container Memory > 85%"
+          description: "Pod {{ $labels.pod }} memory is reaching limit ({{ $value | printf \"%.1f\" }}%). Risk of OOM."
+
+      - alert: ContainerCPUThrottlingHigh
+        expr: (sum by (pod) (rate(container_cpu_cfs_throttled_periods_total{namespace="demo-app"}[5m])) / sum by (pod) (rate(container_cpu_cfs_periods_total{namespace="demo-app"}[5m]))) * 100 > 25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container CPU throttled"
+          description: "Pod {{ $labels.pod }} CPU is being throttled by {{ $value | printf \"%.1f\" }}%."
+
+      # Deployment Replica Status
+      - alert: DeploymentReplicasMismatch
+        expr: kube_deployment_status_replicas_available{namespace="demo-app"} < kube_deployment_spec_replicas{namespace="demo-app"}
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Deployment replicas degraded"
+          description: "Deployment {{ $labels.deployment }} has fewer running replicas than desired."
+
+      # Alert: Application Endpoint Down (Blackbox HTTP Check)
+      - alert: ApplicationEndpointDown
+        expr: probe_success{job="app-http-probes"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application HTTP probe failed"
+          description: "Endpoint {{ $labels.instance }} is unreachable or returned a non-200 HTTP status code."
+
+  - name: devops_node_system_alerts
+    rules:
+      - alert: NodeMemoryPressureHigh
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node Memory > 85%"
+          description: "Node {{ $labels.instance }} memory saturation has exceeded 85%."
+
+      - alert: NodeDiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node Disk Space < 15%"
+          description: "Root filesystem on node {{ $labels.instance }} has less than 15% free space remaining."
+
+  - name: devops_jenkins_pipeline_alerts
+    rules:
+      - alert: JenkinsHighBuildFailureRate
+        expr: increase(jenkins_runs_failure_total[15m]) > 2
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Surge in Jenkins build failures"
+          description: "Multiple pipeline runs failed within the last 15 minutes."
+
+      - alert: JenkinsQueueCongestion
+        expr: jenkins_queue_size_value > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Jenkins build queue backlogged"
+          description: "More than 3 jobs waiting in Jenkins build queue for longer than 5 minutes."

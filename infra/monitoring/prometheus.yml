@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "/etc/prometheus/alert_rules.yml"
+
+scrape_configs:
+  # 1. Pipeline Monitoring: Jenkins Controller via Prometheus Plugin
+  - job_name: "jenkins"
+    metrics_path: "/prometheus/"
+    basic_auth:
+      username: "admin"
+      password: "admin123"
+    static_configs:
+      - targets: ["jenkins-controller:8080"]
+
+  # 2. Kubernetes & App Workloads: Federate from In-Cluster K3s Prometheus
+  - job_name: "k3s-cluster"
+    honor_labels: true
+    metrics_path: "/federate"
+    params:
+      "match[]":
+        - '{__name__=~"kube_.+|container_.+|node_.+"}'
+    static_configs:
+      - targets: ["k3s:30090"]
+
+  # 3. Prometheus Self-Monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # 4. Application Synthetic Health Checks (Demo Frontend & Backend)
+  - job_name: "app-http-probes"
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - "http://k3s:30080/healthz"       # Frontend App HTTP check
+          - "http://k3s:30080/api/status"    # Frontend -> Backend Proxy HTTP check
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "blackbox-exporter:9115"

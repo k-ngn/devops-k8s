@@ -1,0 +1,482 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "title": "Application Synthetic Health Checks (Blackbox Probes - docker-prometheus)",
+      "type": "row"
+    },
+    {
+      "title": "Frontend HTTP Probe (/healthz)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-compose"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "probe_success{instance=\"http://k3s:30080/healthz\"}",
+          "legendFormat": "HTTP Health"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "DOWN (5xx / Unreachable)",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP (200 OK)",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Backend API Probe (/api/status)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-compose"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "probe_success{instance=\"http://k3s:30080/api/status\"}",
+          "legendFormat": "API Health"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "DOWN / Timeout",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP (200 OK)",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "HTTP Probe Latency",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-compose"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "probe_duration_seconds{job=\"app-http-probes\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 101,
+      "title": "Kubernetes Cluster & Workload Health (k3s-prometheus)",
+      "type": "row"
+    },
+    {
+      "title": "demo-app Ready Pods",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-k3s"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "sum(kube_pod_status_ready{namespace=\"demo-app\", condition=\"true\"}) or vector(0)",
+          "legendFormat": "Ready Pods"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          }
+        }
+      }
+    },
+    {
+      "title": "demo-app Pod Restarts (15m)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-k3s"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"demo-app\"}[15m])) or vector(0)",
+          "legendFormat": "Restarts"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Container Memory Working Set",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-k3s"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 11
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum(container_memory_working_set_bytes{namespace=\"demo-app\", container!=\"\"}) by (pod)",
+          "legendFormat": "{{pod}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      }
+    },
+    {
+      "title": "Container CPU Usage",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-k3s"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 11
+      },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"demo-app\", container!=\"\"}[5m])) by (pod)",
+          "legendFormat": "{{pod}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cores"
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 102,
+      "title": "Jenkins CI/CD Pipeline Health (docker-prometheus)",
+      "type": "row"
+    },
+    {
+      "title": "Total Pipeline Runs",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-compose"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 18
+      },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "sum(jenkins_runs_total) or (sum(jenkins_runs_success_total) + sum(jenkins_runs_failure_total) + sum(jenkins_runs_aborted_total)) or vector(0)",
+          "legendFormat": "Total Runs"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          }
+        }
+      }
+    },
+    {
+      "title": "Successful Runs",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-compose"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 18
+      },
+      "id": 9,
+      "targets": [
+        {
+          "expr": "sum(jenkins_runs_success_total) or vector(0)",
+          "legendFormat": "Success"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "fixed"
+          }
+        }
+      }
+    },
+    {
+      "title": "Failed Runs",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-compose"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 18
+      },
+      "id": 10,
+      "targets": [
+        {
+          "expr": "sum(jenkins_runs_failure_total) or vector(0)",
+          "legendFormat": "Failed"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Build Queue Backlog",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-compose"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 18
+      },
+      "id": 11,
+      "targets": [
+        {
+          "expr": "jenkins_queue_size_value or vector(0)",
+          "legendFormat": "Queue Size"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Jenkins Agent Executors (In-Use vs Free)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "ds-prom-compose"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 18
+      },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "jenkins_executor_in_use_value or vector(0)",
+          "legendFormat": "In Use"
+        },
+        {
+          "expr": "jenkins_executor_free_value or vector(0)",
+          "legendFormat": "Free"
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [
+    "devops",
+    "k3s",
+    "jenkins",
+    "blackbox"
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "title": "Central DevOps Overview",
+  "uid": "central-devops-working"
+}

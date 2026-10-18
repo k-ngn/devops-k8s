@@ -1,0 +1,20 @@
+apiVersion: 1
+
+datasources:
+  # Source 1: Central Prometheus (Host Compose)
+  - name: docker-prometheus
+    type: prometheus
+    uid: ds-prom-compose
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+
+  # Source 2: In-Cluster K3s Prometheus
+  - name: k3s-prometheus
+    type: prometheus
+    uid: ds-prom-k3s
+    access: proxy
+    url: http://k3s:30090
+    isDefault: false
+    editable: false
